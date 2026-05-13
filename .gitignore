@@ -179,3 +179,14 @@ cython_debug/
 #  refer to https://docs.cursor.com/context/ignore-files
 .cursorignore
 .cursorindexingignore
+
+# Project-specific ignores
+.streamlit/secrets.toml
+.pytest_cache/
+.coverage
+htmlcov/
+.ipynb_checkpoints/
+*.db
+*.sqlite
+*.shelve
+cache/
