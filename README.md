@@ -8,7 +8,8 @@ Transport DSS（Explainable AI Decision Support System）是一套針對台灣�
 
 ## 技術架構
 
-```使用者輸入（Streamlit UI）
+```text
+使用者輸入（Streamlit UI）
         ↓
 輸入驗證（input_validator.py）
         ↓
@@ -27,7 +28,8 @@ XAI 解釋（xai_report.py → SHAP + 決策路徑 + 反事實）
 
 ## 專案結構
 
-```xai-dss/
+```text
+xai-dss/
 ├── data/
 │   ├── api_client.py          # 外部 API 串接 + 快取
 │   ├── input_validator.py     # 使用者輸入驗證
@@ -59,7 +61,8 @@ XAI 解釋（xai_report.py → SHAP + 決策路徑 + 反事實）
 
 ## 安裝方式
 
-```bash
+```text
+bash
 pip install -r requirements.txt
 ```
 
@@ -67,6 +70,7 @@ pip install -r requirements.txt
 
 ## 執行方式
 
-```bash
+```text
+bash
 streamlit run ui/app.py
 ```
