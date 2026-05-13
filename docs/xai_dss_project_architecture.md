@@ -93,7 +93,7 @@
 
 **路徑**：`data/api_client.py`
 
-### 功能
+### M1 功能
 
 - 取得各交通方式的距離、時間與基礎成本資料
 - 讀取靜態資料作為主要資料來源或 fallback
@@ -118,7 +118,7 @@
 
 **路徑**：`data/input_validator.py`
 
-### 功能
+### M2 功能
 
 - 驗證人數是否在合理範圍內
 - 驗證預算是否為有效數值
@@ -138,7 +138,7 @@
 
 **路徑**：`features/feature_engineer.py`
 
-### 功能
+### M3 功能
 
 - 計算交通方式的成本特徵（cost）
 - 計算交通方式的時間特徵（time）
@@ -149,7 +149,7 @@
 ### 三大特徵
 
 | 特徵 | 說明 |
-|---|---|
+| --- | --- |
 | cost | 總成本或人均成本，包含票價、租車成本等 |
 | time | 預估總時間，包含移動、等待與轉乘時間 |
 | convenience | 根據行李、人數、轉乘與彈性估算便利性 |
@@ -163,7 +163,7 @@
 - `models/scoring_model.py`
 - `models/decision_tree.py`
 
-### 功能
+### M4 功能
 
 - 使用加權評分模型產生各交通方式分數
 - 使用決策樹模型產生可解釋的推薦規則
@@ -184,7 +184,7 @@ score = w_cost × cost_score + w_time × time_score + w_convenience × convenien
 
 **路徑**：`xai/xai_report.py`
 
-### 功能
+### M5 功能
 
 - 產生特徵貢獻分析
 - 將決策樹 decision path 轉換為中文 IF–THEN 說明
@@ -207,7 +207,7 @@ score = w_cost × cost_score + w_time × time_score + w_convenience × convenien
 
 **路徑**：`ui/app.py`
 
-### 功能
+### M6 功能
 
 - 提供側邊欄輸入表單
 - 提供成本、時間、便利性權重滑桿
@@ -227,7 +227,7 @@ score = w_cost × cost_score + w_time × time_score + w_convenience × convenien
 - `fare_table.csv`
 - `city_hub_map.json`
 
-### 功能
+### M7 功能
 
 - 作為 MVP 階段的主要資料來源
 - 作為 API 失效時的 fallback
@@ -239,7 +239,7 @@ score = w_cost × cost_score + w_time × time_score + w_convenience × convenien
 
 **路徑**：`tests/`
 
-### 功能
+### M8 功能
 
 - 單元測試
 - 情境測試
@@ -253,13 +253,13 @@ score = w_cost × cost_score + w_time × time_score + w_convenience × convenien
 
 ## 成員 A：資料與後端模組
 
-### 負責模組
+### 成員 A 負責模組
 
 - M1 API Client
 - M2 Input Validator
 - M7 Static Data
 
-### 主要任務
+### 成員 A 主要任務
 
 - 建立靜態票價與時間資料
 - 建立城市與交通樞紐對照表
@@ -267,7 +267,7 @@ score = w_cost × cost_score + w_time × time_score + w_convenience × convenien
 - 設計統一資料輸出格式
 - 撰寫資料來源與限制說明
 
-### 對應報告段落
+### 成員 A 對應報告段落
 
 - 資料來源
 - 資料處理
@@ -278,13 +278,13 @@ score = w_cost × cost_score + w_time × time_score + w_convenience × convenien
 
 ## 成員 B：模型與 XAI 模組
 
-### 負責模組
+### 成員 B 負責模組
 
 - M3 Feature Engineer
 - M4 Decision Model
 - M5 XAI Report
 
-### 主要任務
+### 成員 B 主要任務
 
 - 設計 cost / time / convenience 特徵
 - 實作加權評分模型
@@ -292,7 +292,7 @@ score = w_cost × cost_score + w_time × time_score + w_convenience × convenien
 - 設計 XAI 解釋輸出
 - 驗證模型結果是否合理
 
-### 對應報告段落
+### 成員 B 對應報告段落
 
 - 特徵工程
 - 模型設計
@@ -303,13 +303,13 @@ score = w_cost × cost_score + w_time × time_score + w_convenience × convenien
 
 ## 成員 C：UI、整合與測試
 
-### 負責模組
+### 成員 C 負責模組
 
 - M6 Streamlit UI
 - M8 Tests
 - README / Demo 流程
 
-### 主要任務
+### 成員 C 主要任務
 
 - 建立 Streamlit 介面
 - 串接資料模組與模型模組
@@ -318,7 +318,7 @@ score = w_cost × cost_score + w_time × time_score + w_convenience × convenien
 - 設計 Demo 流程
 - 整理 README 與最終展示素材
 
-### 對應報告段落
+### 成員 C 對應報告段落
 
 - 系統架構
 - 使用流程
@@ -330,7 +330,7 @@ score = w_cost × cost_score + w_time × time_score + w_convenience × convenien
 ## 六、五週開發時程
 
 | 週次 | 目標 | 主要交付 |
-|---|---|---|
+| --- | --- | --- |
 | Week 1 | 建立專案骨架與 MVP | 靜態資料、基本輸入、初版推薦流程 |
 | Week 2 | 完成特徵工程與評分模型 | cost/time/convenience、權重滑桿、多方案比較 |
 | Week 3 | 加入 AI 與 XAI | 決策樹、特徵貢獻、決策路徑、反事實提示 |
@@ -345,13 +345,13 @@ score = w_cost × cost_score + w_time × time_score + w_convenience × convenien
 
 本系統選擇加權評分模型與決策樹，原因是這兩種方法容易解釋，能讓使用者理解推薦結果背後的邏輯。雖然更複雜的模型可能在某些資料情境下提供更高準確度，但其黑箱性較高，不符合本專題「可解釋決策支援」的核心目標。
 
-### 放棄的替代方案
+### Decision 1 放棄的替代方案
 
 - 深度學習模型
 - 複雜集成模型
 - 完全黑箱式推薦模型
 
-### 限制
+### Decision 1 限制
 
 - 較難捕捉複雜非線性關係
 - 模型表現依賴特徵設計品質
@@ -362,13 +362,13 @@ score = w_cost × cost_score + w_time × time_score + w_convenience × convenien
 
 本系統優先使用靜態資料與情境設計資料，原因是期末專題時程有限，靜態資料較容易控制、測試與重現。即時交通資料雖然更貼近現實，但會增加 API 申請、連線穩定性、資料格式與錯誤處理的複雜度。
 
-### 放棄的替代方案
+### Decision 2 放棄的替代方案
 
 - 完全依賴 Google Maps API
 - 即時票價與即時班次查詢
 - 即時路況整合
 
-### 限制
+### Decision 2 限制
 
 - 無法反映即時交通狀況
 - 實際票價與時間可能與系統資料不同
@@ -379,13 +379,13 @@ score = w_cost × cost_score + w_time × time_score + w_convenience × convenien
 
 本系統定位為部分自動化的決策支援工具。系統會自動完成資料處理、模型計算與解釋產生，但不會替使用者做最終決策。使用者仍可依自身情境與偏好判斷是否採納系統建議。
 
-### 放棄的替代方案
+### Decision 3 放棄的替代方案
 
 - 直接指定唯一最佳方案
 - 自動替使用者完成訂票或租車
 - 隱藏模型推論過程
 
-### 限制
+### Decision 3 限制
 
 - 使用者仍需自行理解與判斷
 - 若使用者誤解結果，仍可能做出不適合的選擇
