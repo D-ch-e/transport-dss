@@ -4,7 +4,7 @@
 
 ## 系統簡介
 
-Transport DSS（Explainable AI Decision Support System）是一套針對台灣交通情境設計的決策支援工具。使用者輸入人數、行李量、預算、時間需求與起訖地點後，系統會推薦最適合的交通方式（高鐵、台鐵、客運或租車），並透過可解釋 AI 技術說明推薦依據。
+Transport DSS（Explainable AI Decision Support System）是一套針對北北基桃景點交通情境設計的決策支援工具。使用者從 10 處景點輸入起訖地、人數、行李量、預算與時間需求後，系統會推薦最適合的交通方式，並透過可解釋 AI 技術說明推薦依據。
 
 ## 技術架構
 
@@ -34,8 +34,9 @@ xai-dss/
 │   ├── api_client.py          # 外部 API 串接 + 快取
 │   ├── input_validator.py     # 使用者輸入驗證
 │   └── static/
-│       ├── fare_table.csv     # 靜態票價與時間參考表（fallback）
-│       └── city_hub_map.json  # 城市名 → 交通樞紐座標對照表
+│       ├── geocoding_attractions.csv # 北北基桃 10 處景點座標
+│       ├── fare_table.csv            # legacy 靜態票價與時間參考表
+│       └── city_hub_map.json         # legacy 城市名 → 交通樞紐座標對照表
 │
 ├── features/
 │   └── feature_engineer.py   # cost / time / convenience 特徵計算

@@ -1,0 +1,11 @@
+﻿地點簡稱,查詢名稱,Google回傳地址,緯度_lat,經度_lng,place_id,location_type,查詢狀態
+北車,台北車站,100台灣臺北市中正區黎明里臺北車站,25.0474428,121.5170955,ChIJcYy0Y3KpQjQRXiW_s2lGln8,GEOMETRIC_CENTER,OK
+101,台北101,"Taipei 101, No. 7信義路五段西村里信義區臺北市台灣 110",25.033976,121.5645389,ChIJH56c2rarQjQRphD9gvC8BhI,ROOFTOP,OK
+陽明山竹子湖,陽明山竹子湖,"112台灣臺北市北投區 陽明山國家公園, 核心區",25.1726423,121.5333316,ChIJ77e2jh2yQjQR-H9rpswVIac,GEOMETRIC_CENTER,OK
+碧潭,碧潭風景區,231台灣新北市新店區新店路碧潭風景區,24.9559849,121.5365043,ChIJLY_oiYcBaDQRCELSB3LZxZk,GEOMETRIC_CENTER,OK
+小人國,小人國主題樂園,325台灣桃園市龍潭區高原里高原路891號,24.8313646,121.1872475,ChIJIVlPqhY8aDQRcSMa0PLZrkk,ROOFTOP,OK
+廟口夜市,基隆廟口夜市,200台灣基隆市仁愛區玉田里仁三路,25.1282405,121.7435579,ChIJY5adFT5OXTQRHkmS-RPdhB0,GEOMETRIC_CENTER,OK
+三峽老街,三峽老街,237台灣新北市三峽區三峽里民權街37-147號,24.9337605,121.3698182,ChIJAQAAAAD_ZzQRNBVBgWpAXiE,ROOFTOP,OK
+桃機,桃園國際機場,33758台灣桃園市大園區三石里航站南路9號臺灣桃園國際機場 (TPE),25.0804884,121.2311579,ChIJ1RXSYsCfQjQRCbG1qZC2o3A,ROOFTOP,OK
+龍山寺,艋舺龍山寺,10853台灣臺北市萬華區廣州街211號,25.0373106,121.4998654,ChIJCd7n16ipQjQRihzEWF4z6Pg,ROOFTOP,OK
+木柵動物園,臺北市立動物園,116台灣臺北市文山區萬興里新光路二段30號,24.9985635,121.5809857,ChIJj4EySmCqQjQRZte0Cf0G_qo,ROOFTOP,OK

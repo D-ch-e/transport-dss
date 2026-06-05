@@ -190,3 +190,17 @@ htmlcov/
 *.sqlite
 *.shelve
 cache/
+
+# macOS
+.DS_Store
+
+# Claude Code local settings
+.claude/
+
+# Large / generated data files
+data/static/synthetic/
+data/models/
+data/ml/
+data/cache/
+model_data/
+*.pkl

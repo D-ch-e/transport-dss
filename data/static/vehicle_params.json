@@ -1,0 +1,29 @@
+{
+    "租車": {
+        "billing": "hourly",
+        "toll_per_km": 1.2,
+        "car_types": [
+            {"name": "PRIUS C", "hourly_price": 250, "mileage_fee_per_km": 3.4, "max_passengers": 5, "max_luggage": 3},
+            {"name": "YARIS", "hourly_price": 250, "mileage_fee_per_km": 3.4, "max_passengers": 5, "max_luggage": 2},
+            {"name": "VIOS", "hourly_price": 250, "mileage_fee_per_km": 3.4, "max_passengers": 5, "max_luggage": 1},
+            {"name": "FIT", "hourly_price": 260, "mileage_fee_per_km": 3.4, "max_passengers": 5, "max_luggage": 1},
+            {"name": "ALTIS", "hourly_price": 260, "mileage_fee_per_km": 3.5, "max_passengers": 5, "max_luggage": 3},
+            {"name": "ALTIS HYBRID", "hourly_price": 350, "mileage_fee_per_km": 3.5, "max_passengers": 5, "max_luggage": 3},
+            {"name": "COROLLA CROSS", "hourly_price": 370, "mileage_fee_per_km": 3.5, "max_passengers": 5, "max_luggage": 4},
+            {"name": "SIENTA", "hourly_price": 400, "mileage_fee_per_km": 5.0, "max_passengers": 7, "max_luggage": 4}
+        ],
+        "note": "iRent 時租制：時租價×時數 + 里程費×公里 + 過路費×高速公里。hourly_price 為官網平日『定價』，另有平日/假日優惠價；max_luggage 為估算大型行李件數，皆待核對。"
+    },
+    "高鐵": {
+        "max_luggage_per_person": 2,
+        "luggage_note": "大型行李需放置行李區，空間有限"
+    },
+    "台鐵": {
+        "max_luggage_per_person": 2,
+        "luggage_note": "可攜帶行李上車，但空間較擁擠"
+    },
+    "客運": {
+        "max_luggage_per_person": 2,
+        "luggage_note": "行李放置於車底行李廂"
+    }
+}

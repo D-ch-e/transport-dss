@@ -21,10 +21,14 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import streamlit as st
 import pandas as pd
 
-from data.api_client import get_supported_cities, get_route_data
-from data.input_validator import validate_input
-from features.feature_engineer import compute_features
+from data.api_client import get_route_data
+from data.input_validator import validate_input, get_supported_locations
+from features.feature_engineer import compute_features, build_dt_feature_row
 from models.scoring_model import compute_scores
+from models.decision_tree import predict_best_mode, FEATURE_COLS
+from services.route_planner import plan_routes, youbike_context
+from xai.report import build_report
+from config.settings import SETTINGS
 
 # ──────────────────────────────────────────────
 # 頁面設定
@@ -162,7 +166,7 @@ st.markdown(
         border-radius: 8px;
         padding: 4px 12px;
         font-size: 0.85rem;
-        color: #475569;
+        color: #ffffff;
         font-weight: 500;
         margin-right: 8px;
     }
@@ -183,6 +187,69 @@ st.markdown(
     .rank-2 { background: #64748b; }
     .rank-3 { background: #94a3b8; }
     .rank-4 { background: #cbd5e1; color: #475569; }
+    /* ── 行程路線（多式聯運） ── */
+    .itinerary-flow {
+        display: flex; flex-wrap: wrap; align-items: center;
+        gap: 6px 8px;
+        padding: 14px 16px;
+        background: #f0f9ff;
+        border: 1px solid #bae6fd;
+        border-radius: 12px;
+        margin-bottom: 14px;
+        line-height: 1.4;
+    }
+    .flow-node {
+        display: inline-block;
+        background: white;
+        border: 1px solid #cbd5e1;
+        border-radius: 8px;
+        padding: 4px 10px;
+        font-weight: 600;
+        font-size: 0.92rem;
+        color: #0f172a;
+    }
+    .flow-edge {
+        display: inline-block;
+        background: #e0f2fe;
+        border: 1px solid #7dd3fc;
+        border-radius: 6px;
+        padding: 2px 8px;
+        font-size: 0.82rem;
+        color: #075985;
+        text-align: center;
+    }
+    .flow-edge small { color: #0369a1; font-size: 0.72rem; }
+    .flow-arrow { color: #38bdf8; font-weight: 700; padding: 0 2px; }
+    .leg-card {
+        background: white;
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        padding: 12px;
+        height: 100%;
+    }
+    .leg-card .leg-mode {
+        font-weight: 700; color: #0f172a; font-size: 0.95rem; margin-bottom: 4px;
+    }
+    .leg-card .leg-from-to {
+        font-size: 0.82rem; color: #475569; margin-bottom: 8px;
+    }
+    .leg-card .leg-stats {
+        display: flex; flex-wrap: wrap; gap: 8px;
+        font-size: 0.82rem; color: #334155;
+    }
+    .leg-card .leg-stats span {
+        background: #f1f5f9; padding: 2px 8px; border-radius: 6px;
+    }
+    .fare-breakdown {
+        margin-top: 10px;
+        padding: 10px 14px;
+        background: #fffbeb;
+        border-left: 4px solid #f59e0b;
+        border-radius: 6px;
+        font-size: 0.92rem;
+        color: #78350f;
+    }
+    .fare-breakdown b { color: #b45309; font-size: 1.05rem; }
     </style>
     """,
     unsafe_allow_html=True,
@@ -196,6 +263,106 @@ MODE_EMOJI = {
     "台鐵": "🚃",
     "客運": "🚌",
     "租車": "🚗",
+    "捷運": "🚇",
+    "公車": "🚌",
+    "大眾運輸": "🚌",
+    "YouBike": "🚲",
+    "步行/接駁": "🚶",
+    "高鐵+YouBike": "🚄🚲",
+    "台鐵+YouBike": "🚃🚲",
+    "高鐵+捷運": "🚄🚇",
+    "台鐵+捷運": "🚃🚇",
+    "高鐵+捷運+YouBike": "🚄🚇🚲",
+    "台鐵+捷運+YouBike": "🚃🚇🚲",
+}
+
+
+_MODE_DISPLAY_MAP = {
+    "大眾運輸": "公車/客運",
+}
+
+
+def _mode_display(mode: str) -> str:
+    return _MODE_DISPLAY_MAP.get(mode, mode)
+
+
+def _seg_emoji(mode: str) -> str:
+    return MODE_EMOJI.get(mode, "🚏")
+
+
+def render_itinerary(option: dict, *, key_prefix: str = "") -> None:
+    """
+    把 RouteOption 的 segments 視覺化呈現：
+    - 流程圖（emoji + 站名 + 箭頭）
+    - 每段卡片（mode / from→to / 票價 / 時間 / 距離）
+    - 票價組成與總計
+    """
+    segs = option.get("segments") or []
+    if not segs:
+        st.caption("此方案無詳細分段資料。")
+        return
+
+    # ── 流程圖 ──
+    parts = []
+    if segs:
+        parts.append(f"<span class='flow-node'>📍 {segs[0].get('from','起點')}</span>")
+        for s in segs:
+            mode = s.get("mode", "")
+            emoji = _seg_emoji(mode)
+            line = s.get("line")
+            label = f"{emoji} {_mode_display(mode)}" + (f"<br><small>{line}</small>" if line else "")
+            parts.append(f"<span class='flow-edge'>{label}</span>")
+            parts.append(f"<span class='flow-node'>{s.get('to','')}</span>")
+    flow_html = "<span class='flow-arrow'>→</span>".join(parts)
+    st.markdown(
+        f"<div class='itinerary-flow'>{flow_html}</div>",
+        unsafe_allow_html=True,
+    )
+
+    # ── 分段卡片 ──
+    cols = st.columns(len(segs))
+    for i, s in enumerate(segs):
+        mode = s.get("mode", "")
+        emoji = _seg_emoji(mode)
+        cost = int(s.get("cost", 0))
+        dur = int(s.get("duration_min", 0))
+        dist = float(s.get("distance_km", 0.0))
+        cost_txt = f"${cost}" if cost > 0 else "免費"
+        dist_txt = f"{dist:.1f} km" if dist > 0 else "—"
+        with cols[i]:
+            st.markdown(
+                f"""
+                <div class="leg-card">
+                  <div class="leg-mode">{emoji} {_mode_display(mode)}</div>
+                  <div class="leg-from-to">{s.get('from','')} → {s.get('to','')}</div>
+                  <div class="leg-stats">
+                    <span>🎟️ {cost_txt}</span>
+                    <span>⏱️ {dur} 分</span>
+                    <span>📏 {dist_txt}</span>
+                  </div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+    # ── 票價組成 ──
+    paid_segs = [s for s in segs if int(s.get("cost", 0)) > 0]
+    if paid_segs:
+        parts = [f"{s.get('mode','')} ${int(s.get('cost',0))}" for s in paid_segs]
+        total = sum(int(s.get("cost", 0)) for s in segs)
+        st.markdown(
+            f"<div class='fare-breakdown'>💰 票價組成：{' + '.join(parts)} = <b>${total}</b> 元 / 人</div>",
+            unsafe_allow_html=True,
+        )
+
+SOURCE_LABEL = {
+    "static": "靜態",
+    "google": "Google 即時",
+    "tdx+static": "TDX 即時",
+    "tdx+static+youbike": "TDX+YouBike",
+    "google+youbike": "Google+YouBike",
+    "cache": "快取",
+    "cache-stale": "舊快取",
 }
 
 # ──────────────────────────────────────────────
@@ -205,19 +372,19 @@ with st.sidebar:
     st.markdown("## 🚄 交通決策支援系統")
     st.markdown("---")
 
-    cities = get_supported_cities()
+    locations = get_supported_locations()
 
     st.markdown("### 📍 路線設定")
-    origin = st.selectbox("起點", cities, index=0, key="origin")
-    # 預設終點為不同城市
-    default_dest = 1 if len(cities) > 1 else 0
-    destination = st.selectbox("終點", cities, index=default_dest, key="destination")
+    origin = st.selectbox("起點", locations, index=0, key="origin")
+    # 預設終點為不同地點
+    default_dest = 1 if len(locations) > 1 else 0
+    destination = st.selectbox("終點", locations, index=default_dest, key="destination")
 
     st.markdown("---")
     st.markdown("### 👥 旅行條件")
     num_people = st.number_input("人數", min_value=1, max_value=10, value=2, step=1, key="people")
     luggage = st.number_input("行李件數", min_value=0, max_value=10, value=1, step=1, key="luggage")
-    budget = st.number_input("預算上限（元/人）", min_value=100, max_value=10000, value=2000, step=100, key="budget")
+    budget = st.number_input("預算上限（元/人）", min_value=0, max_value=10000, key="budget")
 
     st.markdown("---")
     st.markdown("### ⚖️ 偏好權重")
@@ -243,7 +410,40 @@ with st.sidebar:
         st.warning("請至少設定一項權重大於 0")
 
     st.markdown("---")
-    run_button = st.button("🔍 開始分析", use_container_width=True, type="primary")
+    st.markdown("### 🔌 即時資料來源")
+    api_lines = []
+    api_lines.append(("Google Maps", SETTINGS.has_google))
+    api_lines.append(("TDX 運輸資料", SETTINGS.has_tdx))
+    api_lines.append(("YouBike 開放資料", True))   # 免金鑰
+    for name, ok in api_lines:
+        st.markdown(
+            f"<span class='weight-badge'>{'🟢' if ok else '🔴'} {name}</span>",
+            unsafe_allow_html=True,
+        )
+    if not SETTINGS.enable_realtime:
+        st.warning("即時模式已關閉（ENABLE_REALTIME=false），全部走靜態資料")
+
+    st.markdown("---")
+    col_run, col_refresh = st.columns([3, 2])
+    with col_run:
+        run_button = st.button("🔍 開始分析", use_container_width=True, type="primary")
+    with col_refresh:
+        refresh_button = st.button("🔄 重新查詢", use_container_width=True,
+                                    help="清除本地 API 快取後重新呼叫")
+    if refresh_button:
+        # 清掉 google / tdx / youbike 三個來源的本地快取
+        cleared = 0
+        for sub in ("google", "tdx", "youbike"):
+            p = SETTINGS.cache_dir / sub
+            if p.exists():
+                for f in p.glob("*.json"):
+                    try:
+                        f.unlink(); cleared += 1
+                    except OSError:
+                        pass
+        st.success(f"已清除 {cleared} 個快取檔案，下次查詢會打即時 API")
+        st.session_state["has_run"] = True
+        run_button = True
 
 # ──────────────────────────────────────────────
 # 主頁面標題
@@ -271,8 +471,12 @@ if run_button or st.session_state.get("has_run", False):
     if not valid:
         st.error(f"⚠️ 輸入錯誤：{error_msg}")
     else:
-        # 取得路線資料
-        route_data = get_route_data(origin, destination)
+        # 取得路線資料（即時 API + 多式聯運；缺資料時自動 fallback 到靜態）
+        with st.spinner(f"正在查詢 {origin} → {destination} 的即時資料..."):
+            route_data = plan_routes(
+                origin, destination,
+                num_people=num_people, luggage=luggage,
+            )
 
         if not route_data:
             st.warning(f"找不到 {origin} → {destination} 的交通資料。請嘗試其他路線。")
@@ -280,119 +484,299 @@ if run_button or st.session_state.get("has_run", False):
             # 計算特徵
             features = compute_features(route_data, num_people, luggage)
 
-            # 計算分數
-            results = compute_scores(features, w_cost, w_time, w_conv)
+            # 計算分數（傳入預算，過濾超出預算的方案）
+            results = compute_scores(features, w_cost, w_time, w_conv, budget=budget)
 
-            # 取最佳方案
-            best = results[0]
-            best_emoji = MODE_EMOJI.get(best["mode"], "🚀")
+            if not results:
+                st.warning("找不到符合預算上限的交通方案，請提高預算後再試。")
+                st.stop()
 
-            # ── 推薦卡片 ──
-            st.markdown(
-                f"""
-                <div class="recommendation-card">
-                    <h2>🏆 最佳推薦交通方式</h2>
-                    <div class="mode-name">{best_emoji} {best["mode"]}</div>
-                    <div class="score-text">
-                        綜合評分 {best["total_score"]:.2f} ／ 路線：{origin} → {destination}
-                    </div>
-                </div>
-                """,
-                unsafe_allow_html=True,
+            # 計算決策樹預測
+            distance_km = route_data[0]["distance_km"] if route_data else 0.0
+            dt_result = predict_best_mode(
+                people=num_people,
+                luggage=luggage,
+                budget=budget,
+                time_pref=w_time,
+                cost_pref=w_cost,
+                conv_pref=w_conv,
+                distance_km=distance_km,
+                origin=origin,
+                destination=destination,
             )
 
-            # ── 最佳方案指標 ──
-            cols = st.columns(4)
-            with cols[0]:
+            import altair as alt
+
+            # 取兩系統首選
+            best = results[0]                       # 加權評分首選
+            best_emoji = MODE_EMOJI.get(best["mode"], "🚀")
+
+            # 建立 mode → 原始 route_data 的索引（用來抓 source / fetched_at / segments）
+            route_by_mode = {rd["mode"]: rd for rd in route_data}
+
+            def _dt_matches(dt_zh: str, score_mode: str) -> bool:
+                """寬鬆比對 DT 標籤與評分方案是否指向同一主要交通工具。"""
+                if not dt_zh or not score_mode:
+                    return False
+                if dt_zh == score_mode:
+                    return True
+                keys = ("高鐵", "台鐵", "租車", "捷運", "客運", "公車")
+
+                def toks(s: str) -> set:
+                    t = {k for k in keys if k in s}
+                    if "大眾運輸" in s:
+                        t |= {"公車", "客運", "捷運"}
+                    if "客運" in s:
+                        t |= {"公車"}
+                    if "公車" in s:
+                        t |= {"客運"}
+                    return t
+
+                return bool(toks(dt_zh) & toks(score_mode))
+
+            # DT 首選是否落在可比較方案中
+            dt_zh = dt_result["mode_zh"] if dt_result else None
+            dt_in_table_mode = None
+            if dt_zh:
+                dt_in_table_mode = next(
+                    (r["mode"] for r in results if _dt_matches(dt_zh, r["mode"])),
+                    None,
+                )
+
+            # ── 兩系統預測摘要（並排小卡） ──
+            sum_l, sum_r = st.columns(2)
+            with sum_l:
                 st.markdown(
                     f"""
-                    <div class="metric-card">
-                        <div class="metric-label">人均成本</div>
-                        <div class="metric-value">${best["cost_raw"]:.0f}</div>
-                        <div class="metric-unit">元 / 人</div>
+                    <div style="background: linear-gradient(135deg,#0ea5e9,#6366f1);
+                         border-radius:12px; padding:18px 20px; color:white; height:100%;">
+                        <div style="font-size:.85rem; opacity:.9;">⚖️ 加權評分首選</div>
+                        <div style="font-size:1.8rem; font-weight:700; margin:4px 0;">
+                            {best_emoji} {_mode_display(best["mode"])}</div>
+                        <div style="font-size:.9rem; opacity:.85;">綜合評分 {best["total_score"]:.2f}</div>
                     </div>
                     """,
                     unsafe_allow_html=True,
                 )
-            with cols[1]:
-                hours = int(best["time_raw"]) // 60
-                mins = int(best["time_raw"]) % 60
-                time_display = f"{hours}h {mins}m" if hours > 0 else f"{mins}m"
-                st.markdown(
-                    f"""
-                    <div class="metric-card">
-                        <div class="metric-label">預估時間</div>
-                        <div class="metric-value">{time_display}</div>
-                        <div class="metric-unit">含候車與轉乘</div>
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
-            with cols[2]:
-                st.markdown(
-                    f"""
-                    <div class="metric-card">
-                        <div class="metric-label">便利性</div>
-                        <div class="metric-value">{best["convenience_raw"]:.0f}</div>
-                        <div class="metric-unit">/ 100 分</div>
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
-            with cols[3]:
-                budget_ok = best["cost_raw"] <= budget
-                budget_icon = "✅" if budget_ok else "⚠️"
-                budget_text = "在預算內" if budget_ok else "超出預算"
-                st.markdown(
-                    f"""
-                    <div class="metric-card">
-                        <div class="metric-label">預算檢查</div>
-                        <div class="metric-value">{budget_icon}</div>
-                        <div class="metric-unit">{budget_text}</div>
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
+            with sum_r:
+                if dt_result:
+                    dt_emoji = MODE_EMOJI.get(dt_result["mode_zh"], "🤖")
+                    top_prob = max(
+                        (v for v in dt_result["probabilities"].values()), default=0.0
+                    )
+                    st.markdown(
+                        f"""
+                        <div style="background:#f8fafc; border:1px solid #e2e8f0;
+                             border-radius:12px; padding:18px 20px; height:100%;">
+                            <div style="font-size:.85rem; color:#64748b;">🤖 決策樹 (DT) 首選</div>
+                            <div style="font-size:1.8rem; font-weight:700; margin:4px 0; color:#0f172a;">
+                                {dt_emoji} {_mode_display(dt_result["mode_zh"])}</div>
+                            <div style="font-size:.9rem; color:#64748b;">預測機率 {top_prob*100:.1f}%</div>
+                        </div>
+                        """,
+                        unsafe_allow_html=True,
+                    )
+                else:
+                    st.markdown(
+                        """
+                        <div style="background:#f8fafc; border:1px solid #e2e8f0;
+                             border-radius:12px; padding:18px 20px; height:100%;">
+                            <div style="font-size:.85rem; color:#64748b;">🤖 決策樹 (DT) 首選</div>
+                            <div style="font-size:1.1rem; color:#94a3b8; margin-top:8px;">模型未載入</div>
+                        </div>
+                        """,
+                        unsafe_allow_html=True,
+                    )
 
             st.markdown("---")
 
-            # ── 多方案比較表 ──
+            # ── 多方案比較表（含推薦來源徽章） ──
             st.markdown("### 📊 多方案比較")
+            st.caption("點選表格中的任一列，下方會顯示該方案的行程路線與 XAI 解釋。")
+            if dt_zh and dt_in_table_mode is None:
+                st.caption(f"ℹ️ DT 首選為 **{_mode_display(dt_zh)}**（不在可比較方案中，未於下表標記）。")
+
+            def _fare_composition(rd: dict) -> str:
+                segs = rd.get("segments") or []
+                paid = [s for s in segs if int(s.get("cost", 0)) > 0]
+                if not paid:
+                    return "—"
+                from collections import Counter
+                parts = []
+                modes = [s.get("mode", "") for s in paid]
+                counts = Counter(modes)
+                for m, c in counts.items():
+                    total_cost = sum(int(s.get("cost", 0)) for s in paid if s.get("mode") == m)
+                    if m == "租車":
+                        per_person = total_cost // max(num_people, 1)
+                        label = f"{m} ${per_person}/人"
+                    else:
+                        label = f"{m}×{c}" if c > 1 else m
+                    parts.append(label)
+                return " + ".join(parts)
+
+            def _source_badge(mode: str) -> str:
+                tags = []
+                if mode == best["mode"]:
+                    tags.append("⚖️ 評分首選")
+                if dt_in_table_mode and mode == dt_in_table_mode:
+                    tags.append("🤖 DT首選")
+                return " · ".join(tags) if tags else "—"
 
             comparison_data = []
             for r in results:
                 emoji = MODE_EMOJI.get(r["mode"], "")
                 in_budget = "✅" if r["cost_raw"] <= budget else "❌"
+                raw = route_by_mode.get(r["mode"], {})
+                src = SOURCE_LABEL.get(raw.get("source", "static"), raw.get("source", "—"))
 
                 comparison_data.append({
                     "排名": f"#{r['rank']}",
-                    "交通方式": f"{emoji} {r['mode']}",
+                    "交通方式": f"{emoji} {_mode_display(r['mode'])}",
+                    "推薦來源": _source_badge(r["mode"]),
                     "人均成本（元）": f"${r['cost_raw']:.0f}",
                     "預估時間（分鐘）": f"{r['time_raw']:.0f}",
+                    "轉乘次數": int(r.get("transfers", raw.get("transfers", 0))),
+                    "票價組成": _fare_composition(raw),
                     "便利性分數": f"{r['convenience_raw']:.0f}",
-                    "成本分數": f"{r['cost_score']:.2f}",
-                    "時間分數": f"{r['time_score']:.2f}",
-                    "便利性正規化": f"{r['convenience_score']:.2f}",
                     "加權總分": f"{r['total_score']:.4f}",
+                    "資料來源": src,
                     "預算": in_budget,
                 })
 
             df_comparison = pd.DataFrame(comparison_data)
-            st.dataframe(
+            table_event = st.dataframe(
                 df_comparison,
                 use_container_width=True,
                 hide_index=True,
+                on_select="rerun",
+                selection_mode="single-row",
+                key="cmp_table",
             )
+
+            # 取得被選列；未選取時預設為評分首選（results[0]）
+            sel_rows = []
+            try:
+                sel_rows = table_event.selection.rows  # type: ignore[attr-defined]
+            except AttributeError:
+                sel_rows = []
+            sel_idx = sel_rows[0] if sel_rows else 0
+            selected = results[sel_idx]
+            sel_emoji = MODE_EMOJI.get(selected["mode"], "🚀")
+
+            st.markdown("---")
+
+            # ── 選定方案：行程路線 + XAI 解釋（tabs） ──
+            st.markdown(f"### 🔎 方案詳情：{sel_emoji} {_mode_display(selected['mode'])}")
+            tab_route, tab_xai = st.tabs(["🧭 行程路線", "🔍 XAI 解釋"])
+
+            # ── Tab：行程路線 ──
+            with tab_route:
+                sel_route = route_by_mode.get(selected["mode"])
+                if sel_route and sel_route.get("segments"):
+                    transfers = sel_route.get("transfers", 0)
+                    st.caption(
+                        f"含 **{len(sel_route['segments'])}** 段行程"
+                        f"｜**{transfers}** 次轉乘"
+                    )
+                    render_itinerary(sel_route, key_prefix=f"sel{sel_idx}")
+                else:
+                    st.caption("此方案無分段資料可顯示。")
+
+            # ── Tab：XAI 解釋 ──
+            with tab_xai:
+                # 用 DT 中對應 selected mode 的路線列建立 feature_row（對不到則 None）
+                feature_row = None
+                if dt_result and dt_result.get("top_k") and FEATURE_COLS:
+                    dt_item = next(
+                        (it for it in dt_result["top_k"]
+                         if _dt_matches(it["mode_zh"], selected["mode"])),
+                        None,
+                    ) or dt_result["top_k"][0]
+                    feature_row = build_dt_feature_row(
+                        route_row=dt_item["_route_row"],
+                        people=num_people,
+                        luggage=luggage,
+                        budget=float(budget),
+                        time_pref=w_time,
+                        cost_pref=w_cost,
+                        conv_pref=w_conv,
+                        feature_cols=FEATURE_COLS,
+                    )
+
+                report = build_report(
+                    results=results,
+                    features=features,
+                    feature_row=feature_row,
+                    w_cost=w_cost,
+                    w_time=w_time,
+                    w_conv=w_conv,
+                    budget=budget,
+                    best=selected,
+                )
+
+                st.markdown("#### 📌 推薦原因（加權貢獻分解）")
+                st.info(report["top_reason"])
+
+                contrib_df = pd.DataFrame({
+                    "維度": [c["dim_zh"] for c in report["contributions"]],
+                    "貢獻": [c["contribution"] for c in report["contributions"]],
+                })
+                contrib_chart = (
+                    alt.Chart(contrib_df)
+                    .mark_bar(cornerRadiusEnd=4, color="#6366f1")
+                    .encode(
+                        x=alt.X("貢獻:Q", title="對綜合評分的貢獻"),
+                        y=alt.Y("維度:N", sort="-x", title=None),
+                    )
+                    .properties(height=160)
+                )
+                st.altair_chart(contrib_chart, use_container_width=True)
+
+                st.markdown("#### 🌳 決策路徑（決策樹）")
+                if report["decision_path"]:
+                    st.markdown(f"> {report['decision_path']}")
+                else:
+                    st.caption("決策樹模型尚未載入或此方案無對應節點，無法顯示決策路徑。")
+
+                if report["shap"]:
+                    with st.expander("🧬 SHAP 特徵推力（決策樹）"):
+                        shap_df = pd.DataFrame({
+                            "特徵": [v["feature_zh"] for v in report["shap"]["values"]],
+                            "推力": [v["value"] for v in report["shap"]["values"]],
+                        })
+                        shap_chart = (
+                            alt.Chart(shap_df)
+                            .mark_bar()
+                            .encode(
+                                x=alt.X("推力:Q", title=f"對「{report['shap']['pred_zh']}」的推力"),
+                                y=alt.Y("特徵:N", sort="-x", title=None),
+                                color=alt.condition(
+                                    alt.datum.推力 > 0,
+                                    alt.value("#10b981"),
+                                    alt.value("#ef4444"),
+                                ),
+                            )
+                            .properties(height=220)
+                        )
+                        st.altair_chart(shap_chart, use_container_width=True)
+                else:
+                    st.caption("（未安裝 shap 套件，略過 SHAP 解釋。）")
+
+                st.markdown("#### 🔁 反事實提示")
+                if report["counterfactuals"]:
+                    for tip in report["counterfactuals"]:
+                        st.warning(tip)
+                else:
+                    st.caption("在目前條件下，未找到會改變推薦的反事實情境。")
 
             st.markdown("---")
 
             # ── 特徵分數視覺化 ──
             st.markdown("### 📈 特徵分數比較")
 
-            import altair as alt
-
             chart_df = pd.DataFrame({
-                "交通方式": [r["mode"] for r in results],
+                "交通方式": [_mode_display(r["mode"]) for r in results],
                 "成本分數": [r["cost_score"] for r in results],
                 "時間分數": [r["time_score"] for r in results],
                 "便利性分數": [r["convenience_score"] for r in results],
@@ -418,40 +802,33 @@ if run_button or st.session_state.get("has_run", False):
 
             st.markdown("---")
 
-            # ── 分析說明 ──
-            st.markdown("### 💡 初步分析說明")
-
-            # 找出影響最大的權重
-            weights = best["weights"]
-            max_weight_name = max(weights, key=weights.get)
-            weight_names = {"cost": "成本", "time": "時間", "convenience": "便利性"}
-
-            st.info(
-                f"📌 在您目前的偏好設定下，**{weight_names[max_weight_name]}**"
-                f"的權重最高（{weights[max_weight_name]*100:.0f}%），"
-                f"因此 **{best['mode']}** 獲得了最高的綜合評分。"
-            )
-
-            # 預算提醒
-            over_budget = [r for r in results if r["cost_raw"] > budget]
-            if over_budget:
-                modes_str = "、".join([r["mode"] for r in over_budget])
-                st.warning(
-                    f"💸 以目前的預算上限 ${budget}/人，"
-                    f"以下交通方式超出預算：**{modes_str}**"
-                )
-
-            # 條件提示
-            if num_people >= 3 and best["mode"] != "租車":
-                car = next((r for r in results if r["mode"] == "租車"), None)
-                if car:
-                    st.info(
-                        f"🚗 多人同行提示：{num_people} 人同行時，"
-                        f"租車人均成本為 ${car['cost_raw']:.0f}/人，"
-                        f"可考慮租車方案。"
-                    )
-
-            st.markdown("---")
+            # ── 兩端 YouBike 即時資訊（D5） ──
+            try:
+                yb_ctx = youbike_context(origin, destination, k=3)
+                if yb_ctx["origin"] or yb_ctx["destination"]:
+                    st.markdown("### 🚲 起訖兩端 YouBike 即時狀態")
+                    col_yo, col_yd = st.columns(2)
+                    with col_yo:
+                        st.markdown(f"**起點：{origin} 附近**")
+                        if yb_ctx["origin"]:
+                            for s in yb_ctx["origin"]:
+                                st.markdown(
+                                    f"- `{s['distance_m']}m`  {s['name']}  ·  🚲 可借 **{s['available_rent_bikes']}** ／ 空位 {s['available_return_bikes']}"
+                                )
+                        else:
+                            st.caption("附近 800m 內無可借車站點")
+                    with col_yd:
+                        st.markdown(f"**終點：{destination} 附近**")
+                        if yb_ctx["destination"]:
+                            for s in yb_ctx["destination"]:
+                                st.markdown(
+                                    f"- `{s['distance_m']}m`  {s['name']}  ·  🅿️ 空位 **{s['available_return_bikes']}** ／ 可借 {s['available_rent_bikes']}"
+                                )
+                        else:
+                            st.caption("附近無 YouBike 站點")
+                    st.markdown("---")
+            except Exception as e:
+                st.caption(f"YouBike 即時資料暫時無法取得：{e}")
 
             # ── 系統資訊 ──
             with st.expander("ℹ️ 系統資訊與聲明"):
@@ -460,8 +837,8 @@ if run_button or st.session_state.get("has_run", False):
                     **XAI DSS — 可解釋交通決策支援系統 v0.1（Week 1 MVP）**
 
                     - 📊 資料來源：靜態票價與時間參考表
-                    - 🧮 模型方法：加權評分模型（Weighted Scoring Model）
-                    - 🗺️ 支援路線：台北、台中、台南、高雄（雙向）
+                    - 🧮 模型方法：加權評分模型（Weighted Scoring Model），並提供決策樹（Decision Tree）預測作為對照
+                    - 🗺️ 支援範圍：北北基桃 10 處景點（來自 geocoding_attractions.csv）
 
                     ---
 
