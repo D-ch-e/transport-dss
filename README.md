@@ -117,6 +117,27 @@ pytest
 
 ---
 
+## 模型訓練（Google Colab）
+
+決策樹模型的訓練資料蒐集與訓練流程在 Google Colab 上執行，完整步驟請參考 [docs/colab.md](docs/colab.md)。
+
+簡述流程：
+
+```text
+Step 1  蒐集交通路線資料（Google Maps API）→ taiwan_route_dataset.csv
+Step 2  生成乘客情境資料 → synthetic_real_model_data_ml.csv
+Step 3  交通評分系統測試
+Step 4  Decision Tree 模型訓練 → decision_tree_model.pkl、feature_columns.pkl
+Step 5  使用者推薦測試
+```
+
+- 建議使用 Google Colab 執行，避免本機套件版本不一致。
+- 使用路線蒐集功能前需自行申請 Google Maps API Key，並於 Colab Secrets 設定 `GOOGLE_MAPS_API_KEY`。
+- 訓練產出的 `decision_tree_model.pkl` 與 `feature_columns.pkl` 為本系統 [decision_tree.py](models/decision_tree.py) 推論時使用的模型檔案。
+- 訓練所需的目錄結構與資料可參考 [Google Drive 連結](https://drive.google.com/drive/folders/1OE42tzgXiJbVzUeXDQRQWMZpZRJRT7AC?usp=sharing)。
+
+---
+
 ## 支援景點
 
 北北基桃地區共 10 處景點：台北車站、台北 101、小人國、三峽老街、碧潭、陽明山竹子湖、桃園機場、基隆廟口夜市、木柵動物園、龍山寺。

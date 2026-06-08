@@ -1,5 +1,5 @@
 """
-M6 · Streamlit UI — 使用者介面模組（Week 1 MVP）
+M6 · Streamlit UI — 使用者介面模組
 
 功能：
 - 提供側邊欄輸入表單（起訖地、人數、行李量、預算）
@@ -290,7 +290,7 @@ def _seg_emoji(mode: str) -> str:
     return MODE_EMOJI.get(mode, "🚏")
 
 
-def render_itinerary(option: dict, *, key_prefix: str = "") -> None:
+def render_itinerary(option: dict, *, key_prefix: str = "", num_people: int = 1) -> None:
     """
     把 RouteOption 的 segments 視覺化呈現：
     - 流程圖（emoji + 站名 + 箭頭）
@@ -346,10 +346,15 @@ def render_itinerary(option: dict, *, key_prefix: str = "") -> None:
             )
 
     # ── 票價組成 ──
+    # 租車為整車費用，需除以總人數換算為「每人」票價
+    ppl = max(int(num_people), 1)
     paid_segs = [s for s in segs if int(s.get("cost", 0)) > 0]
     if paid_segs:
-        parts = [f"{s.get('mode','')} ${int(s.get('cost',0))}" for s in paid_segs]
-        total = sum(int(s.get("cost", 0)) for s in segs)
+        def _per_person_cost(s: dict) -> int:
+            cost = int(s.get("cost", 0))
+            return cost // ppl if s.get("mode") == "租車" else cost
+        parts = [f"{s.get('mode','')} ${_per_person_cost(s)}" for s in paid_segs]
+        total = sum(_per_person_cost(s) for s in segs)
         st.markdown(
             f"<div class='fare-breakdown'>💰 票價組成：{' + '.join(parts)} = <b>${total}</b> 元 / 人</div>",
             unsafe_allow_html=True,
@@ -590,7 +595,7 @@ if run_button or st.session_state.get("has_run", False):
 
             st.markdown("---")
 
-            # ── 多方案比較表（含推薦來源徽章） ──
+            # ── 多方案比較表 ──
             st.markdown("### 📊 多方案比較")
             st.caption("點選表格中的任一列，下方會顯示該方案的行程路線與 XAI 解釋。")
             if dt_zh and dt_in_table_mode is None:
@@ -679,7 +684,7 @@ if run_button or st.session_state.get("has_run", False):
                         f"含 **{len(sel_route['segments'])}** 段行程"
                         f"｜**{transfers}** 次轉乘"
                     )
-                    render_itinerary(sel_route, key_prefix=f"sel{sel_idx}")
+                    render_itinerary(sel_route, key_prefix=f"sel{sel_idx}", num_people=num_people)
                 else:
                     st.caption("此方案無分段資料可顯示。")
 
@@ -834,19 +839,20 @@ if run_button or st.session_state.get("has_run", False):
             with st.expander("ℹ️ 系統資訊與聲明"):
                 st.markdown(
                     """
-                    **XAI DSS — 可解釋交通決策支援系統 v0.1（Week 1 MVP）**
+                    **TRANSPORT DSS — 可解釋交通決策支援系統**
 
-                    - 📊 資料來源：靜態票價與時間參考表
+                    - 📊 資料來源：靜態票價與時間參考表、即時資料(Googles Maps、TDX、Youbike)
                     - 🧮 模型方法：加權評分模型（Weighted Scoring Model），並提供決策樹（Decision Tree）預測作為對照
-                    - 🗺️ 支援範圍：北北基桃 10 處景點（來自 geocoding_attractions.csv）
+                    - 🗺️ 支援範圍：北北基桃 10 處景點
 
                     ---
 
                     ⚠️ **決策支援聲明**
 
-                    本系統僅作為交通方式選擇的分析與建議工具。推薦結果會受到資料來源、
-                    模型假設與使用者輸入條件影響，不構成最終決策或結果保證。使用者仍應依
-                    實際交通狀況、票價、班次與個人需求自行判斷。
+                    本系統僅作為交通方式選擇的分析與建議工具。
+                    推薦結果會受到資料來源、模型假設與使用者輸入條件影響，不構成最終決策或結果保證。
+                    本系統顯示之票價、交通狀況、班次資料不保證其準確性。
+                    使用者仍應依實際交通狀況、票價、班次與個人需求自行判斷。
                     """
                 )
 
