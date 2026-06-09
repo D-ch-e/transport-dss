@@ -202,5 +202,10 @@ data/static/synthetic/
 data/models/
 data/ml/
 data/cache/
-model_data/
+# Ignore model_data/ contents (generated CSVs, trained models) ...
+model_data/*
+# ... but track the raw input dataset so notebooks/ is reproducible from a clone
+!model_data/01. google map data/
+model_data/01. google map data/*
+!model_data/01. google map data/taiwan_route_dataset.csv
 *.pkl
