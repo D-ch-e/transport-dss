@@ -1,4 +1,55 @@
+# Transport DSS: Explainable Transport Decision Support
+
+A Streamlit decision support system that recommends how to travel between ten attractions in northern Taiwan, then explains why. It takes party size, luggage, budget and cost, time and convenience preferences, and ranks the available transport options.
+
+![Recommendation page](docs/screenshots/recommendation.png)
+
+## Highlights
+
+- **Two independent recommenders:** a transparent weighted score that responds to user preferences, and a decision tree trained on scenario data.
+- **Explanations:** weighted contribution breakdown, the tree's IF-THEN path, SHAP feature pushes and counterfactual hints.
+- **Live data with fallback:** Google Maps, TDX and YouBike clients with layered caching. The app still runs without API keys by falling back to static tables.
+- **Tested:** 173 pytest tests cover the data layer, features, models, explanations and integration flow.
+
+```mermaid
+flowchart LR
+    A[Streamlit input] --> B[Validation]
+    B --> C[API clients and static data]
+    C --> D[Cost, time and convenience features]
+    D --> E[Weighted score]
+    D --> F[Decision tree]
+    E --> G[XAI report]
+    F --> G
+    G --> H[Ranked options and explanations]
+```
+
+## Model limits
+
+- The decision tree reports about 92% accuracy on a binary best / not-best label. That figure comes from **synthetic passenger scenarios** generated over real route data, so it does not measure real-world traveler satisfaction.
+- Coverage is limited to ten attractions; arbitrary origins and destinations are not supported.
+- Without API keys, some routes offer fewer transport options because they rely on static tables.
+
+## Run it
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env    # optional: add API keys
+streamlit run ui/app.py
+```
+
+Trained model files live in `data/ml/`, which is not tracked in Git. Without them the app shows only the weighted score, and five tests that need the model fail. See [docs/colab.md](docs/colab.md) to train the model. With those files in place, `pytest` passes all 173 tests.
+
+## Team
+
+A three-person university final project. By commit history, [@D-ch-e](https://github.com/D-ch-e) built the Streamlit UI, data and API clients, configuration and services, and [@plsdontrunaway](https://github.com/plsdontrunaway) built the scoring model and decision-tree module. Work done outside Git is not reflected here.
+
+---
+
 # Transport DSS — 可解釋交通決策支援系統
+
+> 模型說明：決策樹約 92% 的準確率是以**合成乘客情境資料**訓練與評估的二元分類（最佳／非最佳）結果，不代表真實使用者的滿意度。訓練好的模型檔位於未納入 Git 的 `data/ml/`。
 
 針對北北基桃地區景點旅遊情境設計的交通推薦決策支援系統，整合即時 API 資料、機器學習模型與可解釋 AI 技術，協助使用者在多種交通方式中做出最適選擇。
 
