@@ -352,11 +352,13 @@ class TestStationFareTables:
         stations = set(df["origin_station"]) | set(df["dest_station"])
         assert {"北車", "小人國", "廟口夜市"} <= stations
 
-    def test_bus_blank_fare_returns_none(self):
-        # 票價未填（NaN）的 OD 應安全回 None，不丟例外；填入真實票價後自動生效
-        from data.api_client import lookup_bus_fare
-        r = lookup_bus_fare("北車", "小人國")  # 表中存在此 OD，但 fare 留空待核對
-        assert r is None
+    def test_bus_blank_fare_returns_none(self, monkeypatch):
+        # 票價未填（NaN）的 OD 應安全回 None，不丟例外
+        import data.api_client as api
+        table = api.load_bus_intercity_fare().copy()
+        table["fare"] = float("nan")
+        monkeypatch.setattr(api, "load_bus_intercity_fare", lambda: table)
+        assert api.lookup_bus_fare("北車", "小人國") is None
 
     def test_bus_no_route_returns_none(self):
         from data.api_client import lookup_bus_fare
